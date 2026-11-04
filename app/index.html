@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<base target="_blank">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Agenda de Atendimentos</title>
+<meta name="theme-color" content="#0f7b6c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Agenda">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icone-180.png">
+<link rel="icon" href="icone-192.png">
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f3f5f7; --card: #fff; --tx: #1c2631; --mut: #657282; --brd: #dde3e9;
+    --pri: #0f7b6c; --pri-tx: #fff; --ok: #1d7f45; --warn: #a35f00; --bad: #b8352a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11161b; --card: #1b232b; --tx: #e5eaef; --mut: #94a1ae; --brd: #2b3640;
+      --pri: #2bb39f; --pri-tx: #062520; --ok: #4cc27e; --warn: #e3a447; --bad: #ef6b5e;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--tx);
+    font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+  header {
+    position: sticky; top: 0; z-index: 5; background: var(--pri); color: var(--pri-tx);
+    padding: calc(12px + env(safe-area-inset-top)) 16px 12px; font-weight: 600; font-size: 17px;
+  }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  #atualizar { background: none; border: 0; color: inherit; font-size: 22px; line-height: 1; padding: 0 4px; }
+  main { padding: 12px 16px; max-width: 640px; margin: 0 auto; }
+  nav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; display: flex;
+    background: var(--card); border-top: 1px solid var(--brd); padding-bottom: env(safe-area-inset-bottom);
+  }
+  nav button { flex: 1; background: none; border: 0; padding: 10px 0 12px; color: var(--mut); font-size: 13px; }
+  nav button span { display: block; font-size: 20px; }
+  nav button.ativo { color: var(--pri); font-weight: 600; }
+  .mais {
+    position: fixed; right: 16px; bottom: calc(86px + env(safe-area-inset-bottom)); z-index: 6;
+    width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--pri); color: var(--pri-tx);
+    font-size: 30px; box-shadow: 0 3px 10px rgba(0,0,0,.25);
+  }
+  h2 { font-size: 20px; margin: 4px 0 12px; }
+  .card { background: var(--card); border: 1px solid var(--brd); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+  .card > * + * { margin-top: 6px; }
+  .linha { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .mut { color: var(--mut); }
+  .pequeno { font-size: 14px; }
+  .vazio { text-align: center; color: var(--mut); padding: 32px 0; }
+  .tag { font-size: 12px; padding: 2px 8px; border-radius: 99px; border: 1px solid currentColor; white-space: nowrap; font-weight: 600; }
+  .tag.agendada { color: var(--pri); } .tag.realizada, .tag.ok { color: var(--ok); }
+  .tag.falta, .tag.warn { color: var(--warn); } .tag.cancelada { color: var(--mut); }
+  .sessao.cancelada { opacity: .6; }
+  a { color: var(--pri); }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .acoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .acoes button, .btn {
+    padding: 9px 14px; border-radius: 10px; border: 1px solid var(--brd); background: var(--card); min-height: 40px;
+  }
+  a.btn { display: inline-flex; align-items: center; text-decoration: none; color: inherit; }
+  .acoes button.pri { background: var(--pri); color: var(--pri-tx); border-color: var(--pri); }
+  .link { background: none; border: 0; padding: 0; color: var(--pri); font-weight: 600; text-align: left; }
+  .perigo { color: var(--bad); }
+  .navdata { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+  .navdata > button { width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--brd); background: var(--card); font-size: 22px; }
+  .navdata div { text-align: center; flex: 1; }
+  .navdata input { border: 0; background: none; color: var(--mut); font: inherit; font-size: 14px; text-align: center; }
+  .resumo { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 10px 0; }
+  .resumo div { background: var(--card); border: 1px solid var(--brd); border-radius: 10px; padding: 10px; }
+  .resumo strong { display: block; font-size: 22px; }
+  .resumo span { font-size: 13px; color: var(--mut); }
+  input, textarea, select {
+    width: 100%; font: inherit; font-size: 16px; color: var(--tx); background: var(--bg);
+    border: 1px solid var(--brd); border-radius: 10px; padding: 10px; margin-top: 4px;
+  }
+  textarea { min-height: 80px; resize: vertical; }
+  label { display: block; margin-bottom: 12px; font-size: 14px; color: var(--mut); }
+  label.check { display: flex; align-items: center; gap: 8px; color: var(--tx); font-size: 16px; }
+  label.check input { width: 22px; height: 22px; margin: 0; }
+  .lado { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  fieldset { border: 1px solid var(--brd); border-radius: 10px; margin: 0 0 12px; padding: 10px; }
+  legend { font-size: 14px; color: var(--mut); padding: 0 4px; }
+  .dias { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .dias label { margin: 0; }
+  .dias input { display: none; }
+  .dias span { display: inline-block; padding: 6px 10px; border: 1px solid var(--brd); border-radius: 99px; color: var(--tx); }
+  .dias input:checked + span { background: var(--pri); color: var(--pri-tx); border-color: var(--pri); }
+  #modal {
+    position: fixed; inset: 0; z-index: 10; background: rgba(0,0,0,.45); display: none;
+    align-items: flex-end; justify-content: center;
+  }
+  #modal.aberto { display: flex; }
+  #modal > div {
+    background: var(--card); width: 100%; max-width: 640px; max-height: 92vh; overflow-y: auto;
+    border-radius: 16px 16px 0 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  }
+  #dialogo {
+    position: fixed; inset: 0; z-index: 15; background: rgba(0,0,0,.5); display: none;
+    align-items: center; justify-content: center; padding: 16px;
+  }
+  #dialogo.aberto { display: flex; }
+  #dialogo > div { background: var(--card); border-radius: 14px; padding: 18px; width: 100%; max-width: 420px; box-shadow: 0 10px 40px rgba(0,0,0,.35); }
+  .acoes button.perigo-pri { background: var(--bad); border-color: var(--bad); color: #fff; }
+  #ocupado {
+    position: fixed; inset: 0; z-index: 20; display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,.25); color: #fff; font-weight: 600;
+  }
+  #ocupado.on { display: flex; }
+  #ocupado div { background: rgba(0,0,0,.7); padding: 12px 18px; border-radius: 10px; margin: 16px; text-align: center; }
+</style>
+</head>
+<body>
+<header><span id="titulo">Agenda de Atendimentos</span><button id="atualizar" data-acao="atualizar" aria-label="Atualizar">⟳</button></header>
+<main><p class="vazio">Carregando…</p></main>
+<button class="mais" data-acao="novaSessao" aria-label="Novo agendamento">+</button>
+<nav>
+  <button data-acao="ir" data-id="agenda"><span>📅</span>Agenda</button>
+  <button data-acao="ir" data-id="pacientes"><span>👥</span><b id="navClientes" style="font-weight:inherit">Pacientes</b></button>
+  <button data-acao="ir" data-id="ajustes"><span>⚙️</span>Ajustes</button>
+</nav>
+<div id="modal"><div></div></div>
+<div id="dialogo"><div></div></div>
+<div id="ocupado"><div>Salvando…</div></div>
+
+<script src="dados.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
