@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Teste Agenda">
+<title>Teste Agenda</title>
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  body { font: 16px/1.4 -apple-system, "Segoe UI", Arial, sans-serif; margin: 0 auto; max-width: 520px; padding: 16px; background: #fff; color: #1c2631; }
+  h1 { font-size: 20px; color: #0f7b6c; }
+  button { display: block; width: 100%; min-height: 46px; margin: 8px 0; border: 1px solid #0f7b6c; border-radius: 10px; background: #fff; color: #0f7b6c; font: inherit; }
+  button.pri { background: #0f7b6c; color: #fff; }
+  #log { white-space: pre-wrap; background: #f3f5f7; border-radius: 10px; padding: 12px; font-size: 14px; }
+</style>
+</head>
+<body>
+<h1>Teste da Agenda sem Apps Script</h1>
+<p>Toque em cada botão, de cima para baixo. No fim, tire uma foto do quadro cinza.</p>
+<button class="pri" id="entrar">1. Entrar com o Google</button>
+<button id="evento">2. Criar evento de teste (amanhã, 08:00)</button>
+<button id="apagar">3. Apagar o evento de teste</button>
+<button id="planilha">4. Criar e apagar uma planilha de teste</button>
+<button id="pdf">5. Compartilhar um PDF</button>
+<button id="renovar">6. Renovar o login</button>
+<div id="log"></div>
+<script>
+  const CLIENTE = '208261430716-j7lpjm0beh0m7shofbhl788eh86v0oie.apps.googleusercontent.com';
+  const ESCOPOS = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email';
+  const $ = id => document.getElementById(id);
+  const log = t => { $('log').textContent += new Date().toLocaleTimeString('pt-BR') + '  ' + t + '\n'; };
+  const noIcone = window.navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  log('Aberto ' + (noIcone ? 'pelo ÍCONE da tela inicial' : 'no navegador'));
+  let token = '', eventoId = '', pedido = null;
+
+  function login(prompt) {
+    return new Promise((ok, falha) => {
+      pedido = pedido || google.accounts.oauth2.initTokenClient({ client_id: CLIENTE, scope: ESCOPOS, callback: () => {} });
+      pedido.callback = r => { if (r.error) return falha(new Error(r.error)); token = r.access_token; ok(r); };
+      pedido.error_callback = e => falha(new Error(e.type || 'erro no login'));
+      pedido.requestAccessToken({ prompt });
+    });
+  }
+
+  async function api(url, opcoes) {
+    const r = await fetch(url, Object.assign({}, opcoes, { headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' } }));
+    const texto = await r.text();
+    if (!r.ok) throw new Error(r.status + ' ' + texto.slice(0, 200));
+    return texto ? JSON.parse(texto) : {};
+  }
+
+  /** Cada botão mostra o resultado no quadro, certo ou errado. */
+  const botao = (id, nome, fn) => { $(id).onclick = () => fn().then(t => log('OK ' + nome + ': ' + t)).catch(e => log('ERRO ' + nome + ': ' + e.message)); };
+
+  botao('entrar', 'login', async () => {
+    const r = await login('');
+    const eu = await api('https://www.googleapis.com/oauth2/v3/userinfo');
+    return eu.email + ', válido por ' + Math.round(r.expires_in / 60) + ' min';
+  });
+  botao('evento', 'evento', async () => {
+    const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(8, 0, 0, 0);
+    const e = await api('https://www.googleapis.com/calendar/v3/calendars/primary/events', { method: 'POST', body: JSON.stringify({
+      summary: 'Teste Agenda', start: { dateTime: d.toISOString() }, end: { dateTime: new Date(d.getTime() + 3600000).toISOString() },
+      reminders: { useDefault: false, overrides: [{ method: 'popup', minutes: 60 }, { method: 'popup', minutes: 15 }] },
+    }) });
+    eventoId = e.id;
+    return 'criado para ' + d.toLocaleString('pt-BR') + '. Confira no Google Agenda antes do próximo passo.';
+  });
+  botao('apagar', 'apagar evento', async () => {
+    if (!eventoId) throw new Error('crie o evento primeiro');
+    await api('https://www.googleapis.com/calendar/v3/calendars/primary/events/' + eventoId, { method: 'DELETE' });
+    eventoId = '';
+    return 'apagado. Confira no Google Agenda.';
+  });
+  botao('planilha', 'planilha', async () => {
+    const p = await api('https://sheets.googleapis.com/v4/spreadsheets', { method: 'POST', body: JSON.stringify({ properties: { title: 'Teste Agenda (pode apagar)' } }) });
+    await api('https://sheets.googleapis.com/v4/spreadsheets/' + p.spreadsheetId + '/values/A1?valueInputOption=RAW', { method: 'PUT', body: JSON.stringify({ values: [['ok']] }) });
+    const lida = await api('https://sheets.googleapis.com/v4/spreadsheets/' + p.spreadsheetId + '/values/A1');
+    await api('https://www.googleapis.com/drive/v3/files/' + p.spreadsheetId, { method: 'DELETE' });
+    return 'criou, escreveu, leu "' + lida.values[0][0] + '" e apagou';
+  });
+  botao('pdf', 'compartilhar', async () => {
+    const doc = new jspdf.jsPDF();
+    doc.text('Teste de compartilhamento da Agenda', 15, 20);
+    const pdf = new File([doc.output('blob')], 'Teste Agenda.pdf', { type: 'application/pdf' });
+    if (!navigator.canShare || !navigator.canShare({ files: [pdf] })) throw new Error('este aparelho não permite compartilhar arquivo');
+    await navigator.share({ files: [pdf], title: 'Teste Agenda' });
+    return 'menu de compartilhar abriu';
+  });
+  botao('renovar', 'renovar', async () => {
+    const r = await login('');
+    return 'renovado por ' + Math.round(r.expires_in / 60) + ' min. Apareceu tela do Google? Anote se pediu algo.';
+  });
+</script>
+</body>
+</html>
