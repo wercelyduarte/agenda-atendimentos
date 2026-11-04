@@ -14,7 +14,7 @@ const ESCOPOS = [
   'https://www.googleapis.com/auth/userinfo.email',
 ];
 const DONO = 'wercely@gmail.com';
-const ACESSOS_ID = ''; // planilha pública só com os hashes dos e-mails liberados
+const ACESSOS_ID = '1JNFXESge1tzhuQIn5reJ8vc0vPEE4eRgXKfwya-k1_g'; // planilha pública só com os hashes dos e-mails liberados
 
 const NOME_PLANILHA = 'Agenda de Atendimentos (dados)';
 const MARCA_PLANILHA = 'agendaAtendimentos'; // marca no Drive para achar a planilha em qualquer aparelho
