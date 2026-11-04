@@ -142,6 +142,7 @@
           .addView(new google.picker.DocsView(google.picker.ViewId.SPREADSHEETS).setMode(google.picker.DocsViewMode.LIST))
           .setOAuthToken(SESSAO.token)
           .setAppId(PROJETO_GOOGLE)
+          .setLocale('pt-BR')
           .setCallback(r => {
             if (r.action === google.picker.Action.PICKED) ok(r.docs[0].id);
             else if (r.action === google.picker.Action.CANCEL) ok('');
