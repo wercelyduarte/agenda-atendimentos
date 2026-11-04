@@ -33,7 +33,7 @@
   const $ = id => document.getElementById(id);
   const log = t => { $('log').textContent += new Date().toLocaleTimeString('pt-BR') + '  ' + t + '\n'; };
   const noIcone = window.navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
-  log('Aberto ' + (noIcone ? 'pelo ÍCONE da tela inicial' : 'no navegador'));
+  log('Aberto ' + (noIcone ? 'pelo ÍCONE da tela inicial' : 'no navegador') + '\n' + navigator.userAgent);
   let token = '', eventoId = '', pedido = null;
 
   function login(prompt) {
